@@ -1,4 +1,5 @@
 /*
+ * Modified in H3Swift for the optional 0...19 extended grid.
  * Copyright 2016-2018, 2020-2023 Uber Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,7 +41,7 @@
  * @param j The desired j component value.
  * @param k The desired k component value.
  */
-void _setIJK(CoordIJK *ijk, int i, int j, int k) {
+void _setIJK(CoordIJK *ijk, CoordValue i, CoordValue j, CoordValue k) {
     ijk->i = i;
     ijk->j = j;
     ijk->k = k;
@@ -56,7 +57,7 @@ void _setIJK(CoordIJK *ijk, int i, int j, int k) {
 void _hex2dToCoordIJK(const Vec2d *v, CoordIJK *h) {
     double a1, a2;
     double x1, x2;
-    int m1, m2;
+    CoordValue m1, m2;
     double r1, r2;
 
     // quantize into the ij system and then normalize
@@ -70,8 +71,8 @@ void _hex2dToCoordIJK(const Vec2d *v, CoordIJK *h) {
     x1 = a1 + x2 / 2.0;
 
     // check if we have the center of a hex
-    m1 = (int)x1;
-    m2 = (int)x2;
+    m1 = (CoordValue)x1;
+    m2 = (CoordValue)x2;
 
     // otherwise round correctly
     r1 = x1 - m1;
@@ -130,11 +131,11 @@ void _hex2dToCoordIJK(const Vec2d *v, CoordIJK *h) {
         {
             long long int axisi = h->j / 2;
             long long int diff = h->i - axisi;
-            h->i = (int)(h->i - 2.0 * diff);
+            h->i = (CoordValue)(h->i - 2.0 * diff);
         } else {
             long long int axisi = (h->j + 1) / 2;
             long long int diff = h->i - axisi;
-            h->i = (int)(h->i - (2.0 * diff + 1));
+            h->i = (CoordValue)(h->i - (2.0 * diff + 1));
         }
     }
 
@@ -153,8 +154,8 @@ void _hex2dToCoordIJK(const Vec2d *v, CoordIJK *h) {
  * @param v The 2D cartesian coordinates of the hex center point.
  */
 void _ijkToHex2d(const CoordIJK *h, Vec2d *v) {
-    int i = h->i - h->k;
-    int j = h->j - h->k;
+    CoordValue i = h->i - h->k;
+    CoordValue j = h->j - h->k;
 
     v->x = i - 0.5 * j;
     v->y = j * M_SQRT3_2;
@@ -204,7 +205,7 @@ void _ijkSub(const CoordIJK *h1, const CoordIJK *h2, CoordIJK *diff) {
  * @param c The ijk coordinates to scale.
  * @param factor The scaling factor.
  */
-void _ijkScale(CoordIJK *c, int factor) {
+void _ijkScale(CoordIJK *c, CoordValue factor) {
     c->i *= factor;
     c->j *= factor;
     c->k *= factor;
@@ -216,7 +217,7 @@ void _ijkScale(CoordIJK *c, int factor) {
  */
 bool _ijkNormalizeCouldOverflow(const CoordIJK *ijk) {
     // Check for the possibility of overflow
-    int max, min;
+    CoordValue max, min;
     if (ijk->i > ijk->j) {
         max = ijk->i;
         min = ijk->j;
@@ -277,7 +278,7 @@ void _ijkNormalize(CoordIJK *c) {
     }
 
     // remove the min value if needed
-    int min = c->i;
+    CoordValue min = c->i;
     if (c->j < min) min = c->j;
     if (c->k < min) min = c->k;
     if (min > 0) {
@@ -318,8 +319,8 @@ Direction _unitIjkToDigit(const CoordIJK *ijk) {
  */
 H3Error _upAp7Checked(CoordIJK *ijk) {
     // Doesn't need to be checked because i, j, and k must all be non-negative
-    int i = ijk->i - ijk->k;
-    int j = ijk->j - ijk->k;
+    CoordValue i = ijk->i - ijk->k;
+    CoordValue j = ijk->j - ijk->k;
 
     // <0 is checked because the input must all be non-negative, but some
     // negative inputs are used in unit tests to exercise the below.
@@ -327,15 +328,15 @@ H3Error _upAp7Checked(CoordIJK *ijk) {
         if (ADD_INT32S_OVERFLOWS(i, i)) {
             return E_FAILED;
         }
-        int i2 = i + i;
+        CoordValue i2 = i + i;
         if (ADD_INT32S_OVERFLOWS(i2, i)) {
             return E_FAILED;
         }
-        int i3 = i2 + i;
+        CoordValue i3 = i2 + i;
         if (ADD_INT32S_OVERFLOWS(j, j)) {
             return E_FAILED;
         }
-        int j2 = j + j;
+        CoordValue j2 = j + j;
 
         if (SUB_INT32S_OVERFLOWS(i3, j)) {
             return E_FAILED;
@@ -345,8 +346,8 @@ H3Error _upAp7Checked(CoordIJK *ijk) {
         }
     }
 
-    ijk->i = (int)lround(((i * 3) - j) * M_ONESEVENTH);
-    ijk->j = (int)lround((i + (j * 2)) * M_ONESEVENTH);
+    ijk->i = (CoordValue)lround(((i * 3) - j) * M_ONESEVENTH);
+    ijk->j = (CoordValue)lround((i + (j * 2)) * M_ONESEVENTH);
     ijk->k = 0;
 
     // Expected not to be reachable, because max + min or max - min would need
@@ -366,8 +367,8 @@ H3Error _upAp7Checked(CoordIJK *ijk) {
  */
 H3Error _upAp7rChecked(CoordIJK *ijk) {
     // Doesn't need to be checked because i, j, and k must all be non-negative
-    int i = ijk->i - ijk->k;
-    int j = ijk->j - ijk->k;
+    CoordValue i = ijk->i - ijk->k;
+    CoordValue j = ijk->j - ijk->k;
 
     // <0 is checked because the input must all be non-negative, but some
     // negative inputs are used in unit tests to exercise the below.
@@ -375,15 +376,15 @@ H3Error _upAp7rChecked(CoordIJK *ijk) {
         if (ADD_INT32S_OVERFLOWS(i, i)) {
             return E_FAILED;
         }
-        int i2 = i + i;
+        CoordValue i2 = i + i;
         if (ADD_INT32S_OVERFLOWS(j, j)) {
             return E_FAILED;
         }
-        int j2 = j + j;
+        CoordValue j2 = j + j;
         if (ADD_INT32S_OVERFLOWS(j2, j)) {
             return E_FAILED;
         }
-        int j3 = j2 + j;
+        CoordValue j3 = j2 + j;
 
         if (ADD_INT32S_OVERFLOWS(i2, j)) {
             return E_FAILED;
@@ -393,8 +394,8 @@ H3Error _upAp7rChecked(CoordIJK *ijk) {
         }
     }
 
-    ijk->i = (int)lround(((i * 2) + j) * M_ONESEVENTH);
-    ijk->j = (int)lround(((j * 3) - i) * M_ONESEVENTH);
+    ijk->i = (CoordValue)lround(((i * 2) + j) * M_ONESEVENTH);
+    ijk->j = (CoordValue)lround(((j * 3) - i) * M_ONESEVENTH);
     ijk->k = 0;
 
     // Expected not to be reachable, because max + min or max - min would need
@@ -414,11 +415,11 @@ H3Error _upAp7rChecked(CoordIJK *ijk) {
  */
 void _upAp7(CoordIJK *ijk) {
     // convert to CoordIJ
-    int i = ijk->i - ijk->k;
-    int j = ijk->j - ijk->k;
+    CoordValue i = ijk->i - ijk->k;
+    CoordValue j = ijk->j - ijk->k;
 
-    ijk->i = (int)lround((3 * i - j) * M_ONESEVENTH);
-    ijk->j = (int)lround((i + 2 * j) * M_ONESEVENTH);
+    ijk->i = (CoordValue)lround((3 * i - j) * M_ONESEVENTH);
+    ijk->j = (CoordValue)lround((i + 2 * j) * M_ONESEVENTH);
     ijk->k = 0;
     _ijkNormalize(ijk);
 }
@@ -431,11 +432,11 @@ void _upAp7(CoordIJK *ijk) {
  */
 void _upAp7r(CoordIJK *ijk) {
     // convert to CoordIJ
-    int i = ijk->i - ijk->k;
-    int j = ijk->j - ijk->k;
+    CoordValue i = ijk->i - ijk->k;
+    CoordValue j = ijk->j - ijk->k;
 
-    ijk->i = (int)lround((2 * i + j) * M_ONESEVENTH);
-    ijk->j = (int)lround((3 * j - i) * M_ONESEVENTH);
+    ijk->i = (CoordValue)lround((2 * i + j) * M_ONESEVENTH);
+    ijk->j = (CoordValue)lround((3 * j - i) * M_ONESEVENTH);
     ijk->k = 0;
     _ijkNormalize(ijk);
 }
@@ -640,11 +641,11 @@ void _downAp3r(CoordIJK *ijk) {
  * @param c1 The first set of ijk coordinates.
  * @param c2 The second set of ijk coordinates.
  */
-int ijkDistance(const CoordIJK *c1, const CoordIJK *c2) {
+CoordValue ijkDistance(const CoordIJK *c1, const CoordIJK *c2) {
     CoordIJK diff;
     _ijkSub(c1, c2, &diff);
     _ijkNormalize(&diff);
-    CoordIJK absDiff = {abs(diff.i), abs(diff.j), abs(diff.k)};
+    CoordIJK absDiff = {llabs(diff.i), llabs(diff.j), llabs(diff.k)};
     return MAX(absDiff.i, MAX(absDiff.j, absDiff.k));
 }
 

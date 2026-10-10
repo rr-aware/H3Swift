@@ -1,4 +1,5 @@
 /*
+ * Modified in H3Swift for the optional 0...19 extended grid.
  * Copyright 2016-2021, 2024 Uber Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -177,6 +178,22 @@ H3Error H3_EXPORT(constructCell)(int res, int baseCellNumber, int *digits,
  * @param out Output: The H3 index corresponding to the string argument
  */
 H3Error H3_EXPORT(stringToH3)(const char *str, H3Index *out) {
+#ifdef H3_EXTENDED
+    if (!str || !*str) return E_FAILED;
+    H3Index value = 0;
+    size_t length = strlen(str);
+    if (length > 32) return E_FAILED;
+    for (size_t i = 0; i < length; i++) {
+        unsigned char c = str[i];
+        int digit = c >= '0' && c <= '9' ? c - '0' :
+                    c >= 'a' && c <= 'f' ? c - 'a' + 10 :
+                    c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+        if (digit < 0) return E_FAILED;
+        value = (value << 4) | digit;
+    }
+    *out = value;
+    return E_SUCCESS;
+#else
     H3Index h = H3_NULL;
     // If failed, h will be unmodified and we should return H3_NULL anyways.
     int read = sscanf(str, "%" PRIx64, &h);
@@ -185,6 +202,7 @@ H3Error H3_EXPORT(stringToH3)(const char *str, H3Index *out) {
     }
     *out = h;
     return E_SUCCESS;
+#endif
 }
 
 /**
@@ -194,6 +212,18 @@ H3Error H3_EXPORT(stringToH3)(const char *str, H3Index *out) {
  * @param sz Size of the buffer `str`
  */
 H3Error H3_EXPORT(h3ToString)(H3Index h, char *str, size_t sz) {
+#ifdef H3_EXTENDED
+    if (sz < 33) return E_MEMORY_BOUNDS;
+    char reverse[32];
+    size_t n = 0;
+    do {
+        reverse[n++] = "0123456789abcdef"[(unsigned)(h & 15)];
+        h >>= 4;
+    } while (h);
+    for (size_t i = 0; i < n; i++) str[i] = reverse[n - i - 1];
+    str[n] = '\0';
+    return E_SUCCESS;
+#else
     // An unsigned 64 bit integer will be expressed in at most
     // 16 digits plus 1 for the null terminator.
     if (sz < 17) {
@@ -202,8 +232,31 @@ H3Error H3_EXPORT(h3ToString)(H3Index h, char *str, size_t sz) {
     }
     sprintf(str, "%" PRIx64, h);
     return E_SUCCESS;
+#endif
 }
 
+#ifdef H3_EXTENDED
+int H3_EXPORT(isValidCell)(H3Index h) {
+    if ((h >> H3_RESERVED_OFFSET) != 8) return false;
+    int res = H3_GET_RESOLUTION(h);
+    int bc = H3_GET_BASE_CELL(h);
+    if (res > MAX_H3_RES || bc >= NUM_BASE_CELLS) return false;
+    bool leading = true;
+    for (int r = 1; r <= MAX_H3_RES; r++) {
+        Direction d = H3_GET_INDEX_DIGIT(h, r);
+        if (r > res) {
+            if (d != INVALID_DIGIT) return false;
+        } else {
+            if (d == INVALID_DIGIT) return false;
+            if (leading && d != CENTER_DIGIT) {
+                if (isBaseCellPentagonArr[bc] && d == K_AXES_DIGIT) return false;
+                leading = false;
+            }
+        }
+    }
+    return true;
+}
+#else
 /*
 The top 8 bits of any cell should be a specific constant:
 
@@ -378,6 +431,8 @@ int H3_EXPORT(isValidCell)(H3Index h) {
     // If no disqualifications were identified, the index is a valid H3 cell.
     return true;
 }
+
+#endif
 
 /**
  * Returns whether or not an H3 index is valid for any mode (cell, directed

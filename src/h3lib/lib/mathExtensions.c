@@ -1,4 +1,5 @@
 /*
+ * Modified in H3Swift for the optional 0...19 extended grid.
  * Copyright 2017 Uber Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +33,8 @@ int64_t _ipow(int64_t base, int64_t exp) {
     while (exp) {
         if (exp & 1) result *= base;
         exp >>= 1;
-        base *= base;
+        // Avoid overflowing an unused square after the final exponent bit.
+        if (exp) base *= base;
     }
 
     return result;

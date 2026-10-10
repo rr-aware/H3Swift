@@ -1,4 +1,5 @@
 /*
+ * Modified in H3Swift for the optional 0...19 extended grid.
  * Copyright 2016-2017, 2020 Uber Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -73,7 +74,11 @@
 #define INV_RES0_U_GNOMONIC 2.61803398874989588842
 
 /** max H3 resolution; H3 version 1 has 16 resolutions, numbered 0 through 15 */
+#ifdef H3_EXTENDED
+#define MAX_H3_RES 19
+#else
 #define MAX_H3_RES 15
+#endif
 
 /** The number of faces on an icosahedron */
 #define NUM_ICOSA_FACES 20

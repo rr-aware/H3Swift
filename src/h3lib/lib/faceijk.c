@@ -1,4 +1,5 @@
 /*
+ * Modified in H3Swift for the optional 0...19 extended grid.
  * Copyright 2016-2023 Uber Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -337,7 +338,8 @@ static const int maxDimByCIIres[] = {
     -1,       // res 13
     1647086,  // res 14
     -1,       // res 15
-    11529602  // res 16
+    11529602, // res 16
+    -1, 80707214, -1, 564950498 // res 17...20 (substrate for res 19)
 };
 
 /** @brief unit scale distance table */
@@ -358,7 +360,8 @@ static const int unitScaleByCIIres[] = {
     -1,      // res 13
     823543,  // res 14
     -1,      // res 15
-    5764801  // res 16
+    5764801, // res 16
+    -1, 40353607, -1, 282475249 // res 17...20
 };
 
 /**
@@ -393,7 +396,12 @@ void _geoToHex2d(const LatLng *g, int res, int *face, Vec2d *v) {
     _geoToClosestFace(g, face, &sqd);
 
     // cos(r) = 1 - 2 * sin^2(r/2) = 1 - 2 * (sqd / 4) = 1 - sqd/2
+#ifdef H3_EXTENDED
+    // acos(1 - x) loses centimeter-scale offsets near an icosahedron face center.
+    double r = res > 15 ? 2 * asin(sqrt(sqd) * 0.5) : acos(1 - sqd * 0.5);
+#else
     double r = acos(1 - sqd * 0.5);
+#endif
 
     if (r < EPSILON) {
         v->x = v->y = 0.0;
@@ -433,9 +441,11 @@ void _geoToHex2d(const LatLng *g, int res, int *face, Vec2d *v) {
  * @param res The H3 resolution of the cell.
  * @param substrate Indicates whether or not this grid is actually a substrate
  *        grid relative to the specified resolution.
+ * @param cellRes Original cell resolution before substrate adjustment.
  * @param g The spherical coordinates of the cell center point.
  */
-void _hex2dToGeo(const Vec2d *v, int face, int res, int substrate, LatLng *g) {
+static void _hex2dToGeoAtResolution(const Vec2d *v, int face, int res,
+                                     int substrate, int cellRes, LatLng *g) {
     // calculate (r, theta) in hex2d
     double r = _v2dMag(v);
 
@@ -469,7 +479,28 @@ void _hex2dToGeo(const Vec2d *v, int face, int res, int substrate, LatLng *g) {
     theta = _posAngleRads(faceAxesAzRadsCII[face][0] - theta);
 
     // now find the point at (r,theta) from the face center
+#ifdef H3_EXTENDED
+    if (cellRes > 15) {
+        // Rotate in Cartesian space. asin(latitude) rounds fine cells near the
+        // poles to exactly +/- pi/2, collapsing their boundaries and area.
+        const LatLng *origin = &faceCenterGeo[face];
+        double slat = sin(origin->lat), clat = cos(origin->lat);
+        double slng = sin(origin->lng), clng = cos(origin->lng);
+        double radial = cos(r), north = sin(r) * cos(theta);
+        double east = sin(r) * sin(theta);
+        double x = radial * clat * clng - north * slat * clng - east * slng;
+        double y = radial * clat * slng - north * slat * slng + east * clng;
+        double z = radial * slat + north * clat;
+        g->lat = atan2(z, hypot(x, y));
+        g->lng = atan2(y, x);
+        return;
+    }
+#endif
     _geoAzDistanceRads(&faceCenterGeo[face], theta, r, g);
+}
+
+void _hex2dToGeo(const Vec2d *v, int face, int res, int substrate, LatLng *g) {
+    _hex2dToGeoAtResolution(v, face, res, substrate, res, g);
 }
 
 /**
@@ -578,7 +609,7 @@ void _faceIjkPentToCellBoundary(const FaceIJK *h, int res, int start,
             // find the intersection and add the lat/lng point to the result
             Vec2d inter;
             _v2dIntersect(&orig2d0, &orig2d1, edge0, edge1, &inter);
-            _hex2dToGeo(&inter, tmpFijk.face, adjRes, 1,
+            _hex2dToGeoAtResolution(&inter, tmpFijk.face, adjRes, 1, res,
                         &g->verts[g->numVerts]);
             g->numVerts++;
         }
@@ -589,7 +620,7 @@ void _faceIjkPentToCellBoundary(const FaceIJK *h, int res, int start,
         if (vert < start + NUM_PENT_VERTS) {
             Vec2d vec;
             _ijkToHex2d(&fijk.coord, &vec);
-            _hex2dToGeo(&vec, fijk.face, adjRes, 1, &g->verts[g->numVerts]);
+            _hex2dToGeoAtResolution(&vec, fijk.face, adjRes, 1, res, &g->verts[g->numVerts]);
             g->numVerts++;
         }
 
@@ -751,7 +782,7 @@ void _faceIjkToCellBoundary(const FaceIJK *h, int res, int start, int length,
             bool isIntersectionAtVertex = _v2dAlmostEquals(&orig2d0, &inter) ||
                                           _v2dAlmostEquals(&orig2d1, &inter);
             if (!isIntersectionAtVertex) {
-                _hex2dToGeo(&inter, centerIJK.face, adjRes, 1,
+                _hex2dToGeoAtResolution(&inter, centerIJK.face, adjRes, 1, res,
                             &g->verts[g->numVerts]);
                 g->numVerts++;
             }
@@ -763,7 +794,7 @@ void _faceIjkToCellBoundary(const FaceIJK *h, int res, int start, int length,
         if (vert < start + NUM_HEX_VERTS) {
             Vec2d vec;
             _ijkToHex2d(&fijk.coord, &vec);
-            _hex2dToGeo(&vec, fijk.face, adjRes, 1, &g->verts[g->numVerts]);
+            _hex2dToGeoAtResolution(&vec, fijk.face, adjRes, 1, res, &g->verts[g->numVerts]);
             g->numVerts++;
         }
 

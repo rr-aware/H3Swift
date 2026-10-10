@@ -1,4 +1,5 @@
 /*
+ * Modified in H3Swift for the optional 0...19 extended grid.
  * Copyright 2016-2023 Uber Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -300,7 +301,8 @@ H3Error H3_EXPORT(getHexagonAreaAvgKm2)(int res, double *out) {
     if (res < 0 || res > MAX_H3_RES) {
         return E_RES_DOMAIN;
     }
-    *out = areas[res];
+    // Levels above 15 use the aperture-7 asymptotic area ratio.
+    *out = res <= 15 ? areas[res] : areas[15] / pow(7.0, res - 15);
     return E_SUCCESS;
 }
 
@@ -315,7 +317,8 @@ H3Error H3_EXPORT(getHexagonAreaAvgM2)(int res, double *out) {
     if (res < 0 || res > MAX_H3_RES) {
         return E_RES_DOMAIN;
     }
-    *out = areas[res];
+    // Levels above 15 use the aperture-7 asymptotic area ratio.
+    *out = res <= 15 ? areas[res] : areas[15] / pow(7.0, res - 15);
     return E_SUCCESS;
 }
 
@@ -328,7 +331,8 @@ H3Error H3_EXPORT(getHexagonEdgeLengthAvgKm)(int res, double *out) {
     if (res < 0 || res > MAX_H3_RES) {
         return E_RES_DOMAIN;
     }
-    *out = lens[res];
+    // Levels above 15 use the aperture-7 asymptotic length ratio.
+    *out = res <= 15 ? lens[res] : lens[15] / pow(sqrt(7.0), res - 15);
     return E_SUCCESS;
 }
 
@@ -341,7 +345,8 @@ H3Error H3_EXPORT(getHexagonEdgeLengthAvgM)(int res, double *out) {
     if (res < 0 || res > MAX_H3_RES) {
         return E_RES_DOMAIN;
     }
-    *out = lens[res];
+    // Levels above 15 use the aperture-7 asymptotic length ratio.
+    *out = res <= 15 ? lens[res] : lens[15] / pow(sqrt(7.0), res - 15);
     return E_SUCCESS;
 }
 

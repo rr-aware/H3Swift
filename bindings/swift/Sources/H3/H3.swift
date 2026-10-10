@@ -45,6 +45,10 @@ public struct GeoCoord: Equatable, Hashable, Sendable {
 /// Polygon boundary represented as a list of coordinates.
 public struct GeoBoundary: Equatable, Hashable, Sendable {
     public var vertices: [GeoCoord]
+
+    public init(vertices: [GeoCoord]) {
+        self.vertices = vertices
+    }
 }
 
 /// Convenience wrapper for results that pair an index with a grid distance.

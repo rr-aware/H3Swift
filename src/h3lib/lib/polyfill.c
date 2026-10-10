@@ -1,4 +1,5 @@
 /*
+ * Modified in H3Swift for the optional 0...19 extended grid.
  * Copyright 2023 Uber Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,8 +49,13 @@ static double MAX_EDGE_LENGTH_RADS[MAX_H3_RES + 1] = {
     0.21577206265130, 0.08308767068495, 0.03148970436439, 0.01190662871439,
     0.00450053330908, 0.00170105523619, 0.00064293917678, 0.00024300820659,
     0.00009184847087, 0.00003471545901, 0.00001312121017, 0.00000495935129,
-    0.00000187445860, 0.00000070847876, 0.00000026777980, 0.00000010121125};
+    0.00000187445860, 0.00000070847876, 0.00000026777980, 0.00000010121125
+#ifdef H3_EXTENDED
+    , 3.8254526e-8, 1.4458751e-8, 5.4649323e-9, 2.0655360e-9
+#endif
+};
 
+#ifndef H3_EXTENDED
 /** All cells that contain the north pole, by res */
 static H3Index NORTH_POLE_CELLS[MAX_H3_RES + 1] = {
     0x8001fffffffffff, 0x81033ffffffffff, 0x820327fffffffff, 0x830326fffffffff,
@@ -63,6 +69,8 @@ static H3Index SOUTH_POLE_CELLS[MAX_H3_RES + 1] = {
     0x84f2939ffffffff, 0x85f29383fffffff, 0x86f29380fffffff, 0x87f29380effffff,
     0x88f29380e1fffff, 0x89f29380e0fffff, 0x8af29380e0d7fff, 0x8bf29380e0d0fff,
     0x8cf29380e0d0dff, 0x8df29380e0d0cff, 0x8ef29380e0d0cc7, 0x8ff29380e0d0cc4};
+
+#endif
 
 /** Pre-calculated bounding boxes for all res 0 cells */
 static BBox RES0_BBOXES[NUM_BASE_CELLS] = {
@@ -246,12 +254,21 @@ H3Error cellToBBox(H3Index cell, BBox *out, bool coverChildren) {
     scaleBBox(out, coverChildren ? CHILD_SCALE_FACTOR : CELL_SCALE_FACTOR);
 
     // Cell that contains the north pole
-    if (cell == NORTH_POLE_CELLS[res]) {
+#ifdef H3_EXTENDED
+    H3Index northPole, southPole;
+    LatLng north = {M_PI_2, 0}, south = {-M_PI_2, 0};
+    H3_EXPORT(latLngToCell)(&north, res, &northPole);
+    H3_EXPORT(latLngToCell)(&south, res, &southPole);
+#else
+    H3Index northPole = NORTH_POLE_CELLS[res];
+    H3Index southPole = SOUTH_POLE_CELLS[res];
+#endif
+    if (cell == northPole) {
         out->north = M_PI_2;
     }
 
     // Cell that contains the south pole
-    if (cell == SOUTH_POLE_CELLS[res]) {
+    if (cell == southPole) {
         out->south = -M_PI_2;
     }
 

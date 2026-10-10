@@ -1,4 +1,5 @@
 /*
+ * Modified in H3Swift for the optional 0...19 extended grid.
  * Copyright 2016-2021 Uber Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -66,7 +67,15 @@ extern "C" {
  *
  * The H3Index fits within a 64-bit unsigned integer.
  */
+#ifdef H3_EXTENDED
+#if !defined(__SIZEOF_INT128__)
+#error "H3Extended requires a compiler target with 128-bit integer support"
+#endif
+// Private 128-bit engine representation; the public bridge uses two UInt64s.
+typedef __uint128_t H3Index;
+#else
 typedef uint64_t H3Index;
+#endif
 
 /**
  * Invalid index used to indicate an error from latLngToCell and related

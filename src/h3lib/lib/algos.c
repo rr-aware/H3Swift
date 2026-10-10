@@ -1,4 +1,5 @@
 /*
+ * Modified in H3Swift for the optional 0...19 extended grid.
  * Copyright 2016-2021 Uber Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -153,10 +154,14 @@ static const Direction NEW_ADJUSTMENT_III[7][7] = {
      CENTER_DIGIT, IJ_AXES_DIGIT}};
 
 /**
- * k value which will encompass all cells at resolution 15.
- * This is the largest possible k in the H3 grid system.
+ * k value where the disk-size formula reaches the total at maximum resolution.
+ * Beyond this threshold, cap the allocation bound at the total cell count.
  */
-static const int K_ALL_CELLS_AT_RES_15 = 13780510;
+#ifdef H3_EXTENDED
+static const int K_ALL_CELLS_AT_MAX_RES = 675244998;
+#else
+static const int K_ALL_CELLS_AT_MAX_RES = 13780510;
+#endif
 
 /**
  * Maximum number of cells that result from the gridDisk algorithm with the
@@ -169,7 +174,7 @@ H3Error H3_EXPORT(maxGridDiskSize)(int k, int64_t *out) {
     if (k < 0) {
         return E_DOMAIN;
     }
-    if (k >= K_ALL_CELLS_AT_RES_15) {
+    if (k >= K_ALL_CELLS_AT_MAX_RES) {
         // If a k value of this value or above is provided, this function will
         // estimate more cells than exist in the H3 grid at the finest
         // resolution. This is a problem since the function does signed integer
